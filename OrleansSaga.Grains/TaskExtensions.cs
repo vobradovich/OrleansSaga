@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans;
 
 namespace OrleansSaga.Grains
 {
@@ -96,6 +97,21 @@ namespace OrleansSaga.Grains
             throw new TimeoutException(String.Format("WithTimeout has timed out after {0}.", timeSpan));
         }
 
+        public static async Task Retry(this Func<Task> action, int tryCount, IBackoffProvider backoffProvider)
+        {
+            await Retry(i => action().Box(), tryCount, backoffProvider);
+        }
+
+        public static async Task Retry(this Func<int, Task> action, int tryCount, IBackoffProvider backoffProvider)
+        {
+            await Retry(i => action(i).Box(), tryCount, backoffProvider);
+        }
+
+        public static async Task<T> Retry<T>(this Func<Task<T>> action, int tryCount, IBackoffProvider backoffProvider)
+        {
+            return await Retry(i => action(), tryCount, backoffProvider);
+        }
+
         public static async Task<T> Retry<T>(Func<int, Task<T>> action, int tryCount, IBackoffProvider backoffProvider)
         {
             T result = default(T);
@@ -114,6 +130,50 @@ namespace OrleansSaga.Grains
             }
             return result;
         }
+
+        public static Func<TMessage, Task<TResult>> WithRetries<TMessage, TResult>(this Func<TMessage, Task<TResult>> action, int tryCount = int.MaxValue, IBackoffProvider backoffProvider = null)
+        {
+            var provider = backoffProvider ?? FixedBackoff.Zero;
+            return async m =>
+            {
+                TResult result = default(TResult);
+                for (int i = 0; i < tryCount; i++)
+                {
+                    try
+                    {
+                        result = await action(m);
+                        return result;
+                    }
+                    catch (Exception ex)
+                    {
+                        TimeSpan delay = provider.Next(i);
+                        await Task.Delay(delay);
+                    }
+                }
+                return result;
+            };
+        }
+
+        public static Func<TMessage, Task> WithRetries<TMessage>(this Func<TMessage, Task> action, int tryCount = int.MaxValue, IBackoffProvider backoffProvider = null)
+        {
+            var provider = backoffProvider ?? FixedBackoff.Zero;
+            return async m =>
+            {
+                for (int i = 0; i < tryCount; i++)
+                {
+                    try
+                    {
+                        await action(m);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        TimeSpan delay = provider.Next(i);
+                        await Task.Delay(delay);
+                    }
+                }
+            };
+        }
     }
 
 
@@ -131,6 +191,10 @@ namespace OrleansSaga.Grains
 
     public class FixedBackoff : IBackoffProvider
     {
+        public static FixedBackoff Zero { get; private set; } = new FixedBackoff(TimeSpan.Zero);
+
+        public static FixedBackoff Second { get; private set; } = new FixedBackoff(TimeSpan.FromSeconds(1));
+
         private readonly TimeSpan fixedDelay;
 
         public FixedBackoff(TimeSpan delay)

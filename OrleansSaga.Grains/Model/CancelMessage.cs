@@ -7,7 +7,12 @@ using System.Threading.Tasks;
 namespace OrleansSaga.Grains.Model
 {
     public class CancelMessage
-    {
-        public string Reason { get; set; }
+    {        
+        public string Reason { get; private set; }
+
+        public CancelMessage(string reason)
+        {
+            Reason = reason;
+        }
     }
 }

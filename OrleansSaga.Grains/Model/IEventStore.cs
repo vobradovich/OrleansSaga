@@ -10,6 +10,6 @@ namespace OrleansSaga.Grains.Model
     {
         Task<IEnumerable<StateEvent>> LoadEvents(long grainId);
 
-        Task SaveEvents(IEnumerable<StateEvent> events);
+        Task AddEvents(params StateEvent[] events);
     }
 }

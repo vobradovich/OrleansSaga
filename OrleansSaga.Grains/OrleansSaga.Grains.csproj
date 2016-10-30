@@ -74,6 +74,7 @@
     <Compile Include="Model\CancelMessage.cs" />
     <Compile Include="Model\IEventStore.cs" />
     <Compile Include="Model\IHandler.cs" />
+    <Compile Include="Model\MemoryEventStore.cs" />
     <Compile Include="Model\StateCommand.cs" />
     <Compile Include="Model\StateEvent.cs" />
     <Compile Include="Model\TicketTaskInfo.cs" />
@@ -88,6 +89,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="TaskExtensions.cs" />
+    <Compile Include="TaskHandler.cs" />
+    <Compile Include="TaskResultExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
