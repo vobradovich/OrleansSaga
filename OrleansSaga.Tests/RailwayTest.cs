@@ -166,6 +166,21 @@ namespace OrleansSaga.Tests
         }
 
         [Test]
+        public async Task SagaTestThrowExceptionRetry()
+        {
+            OnMessage<StartMessage, DoneMessage>(Grains.TaskExtensions.WithRetries<StartMessage, DoneMessage>(m => HandleThrow(m), 10));
+            OnMessage<DoneMessage>(Handle, HandleException);
+            Console.WriteLine($"{DateTime.Now} Start");
+            await Receive(Task.FromResult(new StartMessage()));
+            Console.WriteLine($"{DateTime.Now} Delay");
+            await Task.Delay(3000);
+            // TODO: Add your test code here
+            Console.WriteLine($"{DateTime.Now} Done");
+            var events = await EventStore.LoadEvents(0);
+            Assert.Pass("Your first passing test");
+        }
+
+        [Test]
         public async Task SagaTestCancel()
         {
             OnMessage<StartMessage, DoneMessage>(m => Handle(m));
@@ -199,7 +214,7 @@ namespace OrleansSaga.Tests
         public async Task<DoneMessage> HandleThrow(StartMessage message)
         {
             Console.WriteLine($"{DateTime.Now} HandleThrow DoneMessage");
-            await Task.Delay(1000);
+            await Task.Delay(100);
             throw new Exception();
         }
 

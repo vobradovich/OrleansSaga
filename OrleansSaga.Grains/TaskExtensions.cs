@@ -144,7 +144,7 @@ namespace OrleansSaga.Grains
                         result = await action(m);
                         return result;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (i < tryCount)
                     {
                         TimeSpan delay = provider.Next(i);
                         await Task.Delay(delay);
@@ -166,7 +166,7 @@ namespace OrleansSaga.Grains
                         await action(m);
                         return;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (i < tryCount - 1)
                     {
                         TimeSpan delay = provider.Next(i);
                         await Task.Delay(delay);
@@ -243,6 +243,39 @@ namespace OrleansSaga.Grains
             try
             {
                 var delay = TimeSpan.FromMilliseconds(step.TotalMilliseconds * c);
+                return delay > maxDelay ? maxDelay : delay;
+            }
+            catch (OverflowException)
+            {
+                return maxDelay;
+            }
+        }
+    }
+
+    public class LinearBackoff : IBackoffProvider
+    {
+        private readonly TimeSpan maxDelay;
+        private readonly TimeSpan step;
+
+        public LinearBackoff(TimeSpan step) : this(step, TimeSpan.MaxValue)
+        {
+
+        }
+
+        public LinearBackoff(TimeSpan step, TimeSpan maxDelay)
+        {
+            if (step <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(step), step, "LinearBackoff step must be a positive number.");
+            if (maxDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maxDelay), maxDelay, "LinearBackoff max delay must be a positive number.");
+
+            this.maxDelay = maxDelay;
+            this.step = step;
+        }
+
+        public TimeSpan Next(int attempt)
+        {
+            try
+            {
+                var delay = TimeSpan.FromMilliseconds(step.TotalMilliseconds * attempt);
                 return delay > maxDelay ? maxDelay : delay;
             }
             catch (OverflowException)

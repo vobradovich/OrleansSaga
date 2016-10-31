@@ -14,6 +14,7 @@ namespace OrleansSaga.Tests
     public class AsyncUsageExamples
     {
         [Test]
+        [Repeat(10000)]
         public async Task Promote_with_async_methods_in_the_beginning_of_the_chain()
         {
             var gateway = new EmailGateway();
@@ -28,6 +29,7 @@ namespace OrleansSaga.Tests
         }
 
         [Test]
+        [Repeat(10000)]
         public async Task Promote_with_async_methods_in_the_beginning_and_in_the_middle_of_the_chain()
         {
             var gateway = new EmailGateway();

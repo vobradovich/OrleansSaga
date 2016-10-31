@@ -23,7 +23,7 @@ namespace OrleansSaga.Grains.Services
 
         public async Task<int> ThrowNotTen(int i)
         {
-            await Task.Delay(1000);
+            await Task.Delay(100);
             Console.WriteLine($"{DateTime.Now} SimpleService.ThrowNotTen {i}");
             if (i != 10)
             {
