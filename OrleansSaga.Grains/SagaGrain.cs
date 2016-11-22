@@ -35,6 +35,39 @@ namespace OrleansSaga.Grains
             await base.OnActivateAsync();
         }
 
+        public Func<TMessage, Task<TResult>> WithRetries<TMessage, TResult>(Func<TMessage, Task<TResult>> action, int tryCount = int.MaxValue, IBackoffProvider backoffProvider = null)
+        {
+            var provider = backoffProvider ?? FixedBackoff.Zero;
+            return m =>
+            {
+                var resolver = new TaskCompletionSource<TResult>();
+                RegisterTimer(RetryCallback(m, action, 0, tryCount, backoffProvider), resolver, TimeSpan.Zero, TimeSpan.Zero);
+                return resolver.Task;
+            };
+        }
+
+        private Func<object, Task> RetryCallback<TMessage, TResult>(TMessage message, Func<TMessage, Task<TResult>> action, int current, int tryCount, IBackoffProvider backoffProvider)
+        {
+            return async (state) =>
+            {
+                var resolver = (TaskCompletionSource<TResult>)state;
+                try
+                {
+                    var result = await action(message);
+                    resolver.TrySetResult(result);
+                }
+                catch (Exception ex) when (current < tryCount - 1)
+                {
+                    TimeSpan delay = backoffProvider.Next(current);
+                    RegisterTimer(RetryCallback(message, action, current + 1, tryCount, backoffProvider), resolver, delay, TimeSpan.Zero);
+                }
+                catch (Exception ex)
+                {
+                    resolver.TrySetException(ex);
+                }
+            };
+        }
+
         public Task Receive(Task incomingMessage)
         {
             return TaskDone.Done;

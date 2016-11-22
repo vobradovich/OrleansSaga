@@ -6,13 +6,19 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace OrleansSaga.Grains
-{ 
+{
     public class TaskHandler<TMessage, TResult> : TaskHandler<TMessage>
     {
         public TaskHandler(Func<Task<TMessage>, Task<TResult>> onCompleted = null, Func<Task<TMessage>, Task<TResult>> onFaulted = null, Func<Task<TMessage>, Task<TResult>> onCanceled = null)
             : base(t => onCompleted(t), t => onFaulted(t), t => onCanceled(t), typeof(TResult))
         {
-            
+
+        }
+
+        public TaskHandler(Func<Task<TMessage>, Task<TResult>> handler = null)
+            : this(handler, handler, handler)
+        {
+
         }
 
         public override Task Handle(Task task) => Handle(task as Task<TMessage>);
@@ -62,6 +68,11 @@ namespace OrleansSaga.Grains
         public Func<Task, Task> OnCompleted { get; private set; }
         public Func<Task, Task> OnFaulted { get; private set; }
         public Func<Task, Task> OnCanceled { get; private set; }
+
+        public TaskHandler(Func<Task, Task> hanlder, Type messageType = null, Type resultType = null)
+            : this(hanlder, hanlder, hanlder, messageType, resultType)
+        {
+        }
 
         public TaskHandler(Func<Task, Task> onSuccess = null, Func<Task, Task> onFaulted = null, Func<Task, Task> onCanceled = null, Type messageType = null, Type resultType = null)
         {

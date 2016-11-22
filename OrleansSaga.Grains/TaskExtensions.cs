@@ -144,7 +144,7 @@ namespace OrleansSaga.Grains
                         result = await action(m);
                         return result;
                     }
-                    catch (Exception ex) when (i < tryCount)
+                    catch (Exception ex) when (i < tryCount - 1)
                     {
                         TimeSpan delay = provider.Next(i);
                         await Task.Delay(delay);

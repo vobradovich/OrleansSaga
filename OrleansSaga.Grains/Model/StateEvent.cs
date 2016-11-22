@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
@@ -70,5 +67,7 @@ namespace OrleansSaga.Grains.Model
         public DateTime Created { get; set; }
         public object GetData() => JsonConvert.DeserializeObject(Data, Type.GetType(EventType));
         public T GetData<T>() => JsonConvert.DeserializeObject<T>(Data);
+
+        public override string ToString() => $"Id: {Id}, EventType: {EventType}, TaskStatus: {TaskStatus}, Data: {Data}";
     }
 }

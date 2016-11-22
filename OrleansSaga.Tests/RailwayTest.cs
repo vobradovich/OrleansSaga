@@ -42,6 +42,18 @@ namespace OrleansSaga.Tests
             }
         }
 
+        protected void OnMessage<TMessage, TResult>(Func<Task<TMessage>, Task<TResult>> taskHandler) where TMessage : class
+        {
+            if (!_handlers.ContainsKey(typeof(TMessage)))
+            {
+                var handler = new TaskHandler<TMessage, TResult>(taskHandler);
+                _handlers.Add(typeof(TMessage), handler);
+                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(StateEvent.FromMessage(0, t.Result)), t => EventStore.AddEvents(StateEvent.FromException<TMessage>(0, t.Exception)), t => EventStore.AddEvents(StateEvent.FromCancel<TMessage>(0)));
+                var logHandler = new TaskHandler<TMessage>(t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Result}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Exception}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t}")));
+                _receiverHandlers.Add(typeof(TMessage), new[] { logHandler, storeHandler });
+            }
+        }
+
         public async Task Receive<TMessage>(Task<TMessage> taskMessage)
         {
             //TaskHandler[] pre;
@@ -85,7 +97,6 @@ namespace OrleansSaga.Tests
 
             if (handler.ResultType != null)
             {
-                Task result;
                 var resultEvent = EventStore.LoadEvents(0).Result.FirstOrDefault(e => e.EventType == handler.ResultType.FullName);
                 if (resultEvent != null)
                 {
@@ -153,8 +164,9 @@ namespace OrleansSaga.Tests
         [Test]
         public async Task SagaTestThrowException()
         {
-            OnMessage<StartMessage, DoneMessage>(m => HandleThrow(m));
-            OnMessage<DoneMessage>(m => Handle(m), ex => HandleException(ex));
+            OnMessage<StartMessage, ProgressMessage>(HandleThrow);
+            OnMessage<ProgressMessage, DoneMessage>(Handle, HandleExceptionAndThrow);
+            OnMessage<DoneMessage>(Handle, HandleException);
             Console.WriteLine($"{DateTime.Now} Start");
             await Receive(Task.FromResult(new StartMessage()));
             Console.WriteLine($"{DateTime.Now} Delay");
@@ -168,7 +180,8 @@ namespace OrleansSaga.Tests
         [Test]
         public async Task SagaTestThrowExceptionRetry()
         {
-            OnMessage<StartMessage, DoneMessage>(Grains.TaskExtensions.WithRetries<StartMessage, DoneMessage>(m => HandleThrow(m), 10));
+            OnMessage<StartMessage, ProgressMessage>(Grains.TaskExtensions.WithRetries<StartMessage, ProgressMessage>(m => HandleThrow(m), 10));
+            OnMessage<ProgressMessage, DoneMessage>(Handle, HandleExceptionAndThrow);
             OnMessage<DoneMessage>(Handle, HandleException);
             Console.WriteLine($"{DateTime.Now} Start");
             await Receive(Task.FromResult(new StartMessage()));
@@ -205,15 +218,22 @@ namespace OrleansSaga.Tests
             return new DoneMessage();
         }
 
+        public async Task<DoneMessage> Handle(ProgressMessage message)
+        {
+            Console.WriteLine($"{DateTime.Now} Handle ProgressMessage");
+            await Task.Delay(100, cts.Token);
+            return new DoneMessage();
+        }
+
         public async Task Handle(DoneMessage message)
         {
             Console.WriteLine($"{DateTime.Now} Handle DoneMessage");
             await Task.Delay(2000, cts.Token);
         }
 
-        public async Task<DoneMessage> HandleThrow(StartMessage message)
+        public async Task<ProgressMessage> HandleThrow(StartMessage message)
         {
-            Console.WriteLine($"{DateTime.Now} HandleThrow DoneMessage");
+            Console.WriteLine($"{DateTime.Now} HandleThrow StartMessage");
             await Task.Delay(100);
             throw new Exception();
         }
@@ -222,6 +242,13 @@ namespace OrleansSaga.Tests
         {
             Console.WriteLine($"{DateTime.Now} HandleException {ex}");
             await Task.Delay(1000);
+        }
+
+        public async Task<DoneMessage> HandleExceptionAndThrow(Exception ex)
+        {
+            Console.WriteLine($"{DateTime.Now} HandleExceptionAndThrow {ex}");
+            await Task.Delay(1000);
+            throw ex;
         }
 
         public async Task HandleCanceled()
@@ -239,6 +266,10 @@ namespace OrleansSaga.Tests
     }
 
     public class StartMessage
+    {
+    }
+
+    public class ProgressMessage
     {
     }
 
