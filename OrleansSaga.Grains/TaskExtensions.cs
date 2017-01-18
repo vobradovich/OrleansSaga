@@ -189,6 +189,18 @@ namespace OrleansSaga.Grains
         TimeSpan Next(int attempt);
     }
 
+    public class BackoffData
+    {
+        public TimeSpan Step { get; private set; }
+        public TimeSpan MaxDelay { get; private set; }
+        
+        public BackoffData(TimeSpan step, TimeSpan maxDelay)
+        {
+            Step = step;
+            MaxDelay = maxDelay;
+        }
+    }
+
     public class FixedBackoff : IBackoffProvider
     {
         public static FixedBackoff Zero { get; private set; } = new FixedBackoff(TimeSpan.Zero);

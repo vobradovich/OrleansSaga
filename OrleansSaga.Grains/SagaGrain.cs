@@ -10,13 +10,14 @@ using OrleansSaga.Grains.Model;
 
 namespace OrleansSaga.Grains
 {
-    public class SagaGrain<T> : Grain<T>, ISagaGrain, IRemindable, IHandler, IHandler<CancelMessage>
+    public class SagaGrain<T> : Grain<T>, ISagaGrain, IRemindable, IHandler, IHandler<CancelMessage> where T : new()
     {
-        Dictionary<Type, Func<Task, Func<Task>>> _handlers = new Dictionary<Type, Func<Task, Func<Task>>>();
+        Dictionary<Type, MessageReceiver> _receivers = new Dictionary<Type, MessageReceiver>();
         IEventStore _eventStore;
         public List<StateEvent> Events { get; set; }
         protected CancellationTokenSource _cancellationTokenSource;
         Logger Log;
+        IEventStore EventStore = new MemoryEventStore();
 
         public SagaGrain(IEventStore eventStore)
         {
@@ -28,11 +29,60 @@ namespace OrleansSaga.Grains
             Log = GetLogger();
             _cancellationTokenSource = new CancellationTokenSource();
 
-            OnEvent<CancelMessage>(m => { return Handle(m); });
+            OnMessage<CancelMessage>().Handle(HandleCancel);
 
             Events = (await _eventStore.LoadEvents(this.GetPrimaryKeyLong())).ToList();
             await Replay(Events);
             await base.OnActivateAsync();
+        }
+
+        public async Task Receive<TMessage>(Task<TMessage> taskMessage)
+        {
+            await Receive(taskMessage, typeof(TMessage));
+        }
+
+        public async Task Receive(Task taskMessage, Type messageType)
+        {
+            MessageReceiver receiver;
+            if (!_receivers.TryGetValue(messageType, out receiver))
+            {
+                throw new NotImplementedException();
+            }
+            await receiver.Receive(taskMessage);
+            await receiver.Apply(taskMessage);
+            if (receiver.Handler != null)
+            {
+                await Task.Factory.StartNew(() => Dispatch(taskMessage, receiver.Handler));
+            }
+        }
+
+        public Task Dispatch(Task taskMessage, TaskHandler handler)
+        {
+            if (handler.ResultType == null)
+            {
+                return handler.Handle(taskMessage);
+            }
+            var resultEvent = EventStore.LoadEvents(0).Result.FirstOrDefault(e => e.EventType == handler.ResultType.FullName);
+            if (resultEvent != null)
+            {
+                switch (resultEvent.TaskStatus)
+                {
+                    case TaskStatus.RanToCompletion:
+                        return Receive(Task.FromResult(resultEvent.GetData()), handler.ResultType);
+                    case TaskStatus.Faulted:
+                        return Receive(Task.FromException(resultEvent.GetData<Exception>()), handler.ResultType);                        
+                    case TaskStatus.Canceled:
+                    default:
+                        return Receive(Task.FromCanceled(_cancellationTokenSource.Token), handler.ResultType);
+                        //result = Task.FromException(new Exception());
+                        //result = Task.FromCanceled(cts.Token);
+                }
+            }
+            else
+            {
+                var task = handler.Handle(taskMessage);
+                return task.ContinueWith(t => Receive(t, handler.ResultType));
+            }            
         }
 
         public Func<TMessage, Task<TResult>> WithRetries<TMessage, TResult>(Func<TMessage, Task<TResult>> action, int tryCount = int.MaxValue, IBackoffProvider backoffProvider = null)
@@ -68,38 +118,24 @@ namespace OrleansSaga.Grains
             };
         }
 
-        public Task Receive(Task incomingMessage)
-        {
-            return TaskDone.Done;
-        }
-
-        public Task Receive<TMessage>(Task<TMessage> message)
-        {
-            Func<Task, Func<Task>> handler = null;            
-            if (_handlers.TryGetValue(typeof(TMessage), out handler))
-            {
-                return message.ContinueWith(handler, TaskContinuationOptions.OnlyOnRanToCompletion);
-            }
-            return TaskDone.Done;
-        }
-
         public Task Handle<TMessage>(TMessage message)
         {
             return TaskDone.Done;
         }
 
-
-        protected void OnEvent<TMessage>(Func<Task<TMessage>, Task> action) where TMessage : class
+        protected MessageReceiver<TMessage> OnMessage<TMessage>() where TMessage : class
         {
-            Func<Task, Func<Task>> handler = (Task t) => () => action(t as Task<TMessage>);
-            _handlers.Add(typeof(TMessage), handler);
+            MessageReceiver receiver;
+            if (!_receivers.TryGetValue(typeof(TMessage), out receiver))
+            {
+                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(StateEvent.FromMessage(0, t.Result)), t => EventStore.AddEvents(StateEvent.FromException<TMessage>(0, t.Exception)), t => EventStore.AddEvents(StateEvent.FromCancel<TMessage>(0)));
+                var logHandler = new TaskHandler<TMessage>(t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Result}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Exception}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t}")));
+                receiver = new MessageReceiver<TMessage>(storeHandler.Handle, logHandler.Handle);
+                _receivers.Add(typeof(TMessage), receiver);
+            }
+            return receiver as MessageReceiver<TMessage>;
         }
 
-        protected void OnEvent<TMessage, TResult>(Func<Task<TMessage>, Task<TResult>> action) where TMessage : class
-        {
-            Func<Task, Func<Task<TResult>>> handler = (Task t) => () => action(t as Task<TMessage>);
-            _handlers.Add(typeof(TMessage), handler);
-        }
 
         Task SaveEvents(IEnumerable<StateEvent> events)
         {
@@ -140,6 +176,11 @@ namespace OrleansSaga.Grains
                 _cancellationTokenSource.Cancel();
             }
             return TaskDone.Done;
+        }
+
+        public Task<SagaCanceled> HandleCancel(CancelMessage cancelMessage)
+        {
+            return Task.FromResult(new SagaCanceled());
         }
     }
 }

@@ -15,4 +15,9 @@ namespace OrleansSaga.Grains.Model
             Reason = reason;
         }
     }
+
+    public class SagaCanceled
+    {
+
+    }
 }
