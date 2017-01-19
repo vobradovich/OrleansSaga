@@ -10,7 +10,7 @@ using OrleansSaga.Grains.Model;
 
 namespace OrleansSaga.Grains
 {
-    public class SagaGrain<T> : Grain<T>, ISagaGrain, IRemindable, IHandler, IHandler<CancelMessage> where T : new()
+    public class SagaGrain : Grain, ISagaGrain, IRemindable, IHandler, IHandler<CancelMessage>
     {
         Dictionary<Type, MessageReceiver> _receivers = new Dictionary<Type, MessageReceiver>();
         IEventStore _eventStore;
@@ -26,14 +26,16 @@ namespace OrleansSaga.Grains
 
         public override async Task OnActivateAsync()
         {
-            Log = GetLogger();
+            //Log = GetLogger();
             _cancellationTokenSource = new CancellationTokenSource();
 
             OnMessage<CancelMessage>().Handle(HandleCancel);
+            OnMessage<SagaCanceled>();
 
-            Events = (await _eventStore.LoadEvents(this.GetPrimaryKeyLong())).ToList();
+            //Events = (await _eventStore.LoadEvents(this.GetPrimaryKeyLong())).ToList();
+            Events = (await _eventStore.LoadEvents(0)).ToList();
             await Replay(Events);
-            await base.OnActivateAsync();
+            //await base.OnActivateAsync();
         }
 
         public async Task Receive<TMessage>(Task<TMessage> taskMessage)
@@ -178,7 +180,7 @@ namespace OrleansSaga.Grains
             return TaskDone.Done;
         }
 
-        public Task<SagaCanceled> HandleCancel(CancelMessage cancelMessage)
+        public virtual Task<SagaCanceled> HandleCancel(CancelMessage cancelMessage)
         {
             return Task.FromResult(new SagaCanceled());
         }
