@@ -28,8 +28,15 @@ namespace OrleansSaga.Grains
             //var simpleGrain = providerRuntime.GrainFactory.GetGrain<ISimpleGrain>(0);
             //simpleGrain.Run("TEST!!!!!!");
 
-            var simpleGrain = providerRuntime.GrainFactory.GetGrain<IManagerGrain>(0);
-            simpleGrain.Run(50, 100000);
+            //var simpleGrain = providerRuntime.GrainFactory.GetGrain<IManagerGrain>(0);
+            //simpleGrain.Run(50, 100000);
+
+            for (int i = 0; i < 10; i++)
+            {
+                var railwayTestGrain = providerRuntime.GrainFactory.GetGrain<IRailwayTestGrain>(i);
+                railwayTestGrain.Start();
+
+            }            
 
             return TaskDone.Done;
         }

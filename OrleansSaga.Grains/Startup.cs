@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using OrleansSaga.Grains.Model;
 using OrleansSaga.Grains.Services;
 
 namespace OrleansSaga.Grains
@@ -13,6 +14,7 @@ namespace OrleansSaga.Grains
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.AddSingleton<ISimpleService, SimpleService>();
+            services.AddSingleton<IEventStore, MemoryEventStore>();
 
             return services.BuildServiceProvider();
         }

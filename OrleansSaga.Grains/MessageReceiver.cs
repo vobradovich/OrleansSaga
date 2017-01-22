@@ -8,8 +8,8 @@ namespace OrleansSaga.Grains
 {
     public class MessageReceiver<TMessage> : MessageReceiver
     {
-        public MessageReceiver(Func<Task<TMessage>, Task> receive = null, Func<Task<TMessage>, Task> apply = null)
-            : base((Task t) => receive(t as Task<TMessage>), (Task t) => apply(t as Task<TMessage>), typeof(TMessage))
+        public MessageReceiver(TaskHandler<TMessage> receiver = null, TaskHandler<TMessage> applier = null)
+            : base(receiver, applier, typeof(TMessage))
         {
         }
     }
@@ -17,25 +17,44 @@ namespace OrleansSaga.Grains
     public class MessageReceiver
     {
         public Type MessageType { get; private set; }
-        public Func<Task, Task> Receive { get; set; }
-        public Func<Task, Task> Apply { get; set; }
+        public TaskHandler Receiver { get; set; }
+        public TaskHandler Applier { get; set; }
         public TaskHandler Handler { get; set; }
-
-        public Func<Task, Task> Skip = t => t;
-
-        public MessageReceiver(Func<Task, Task> receive = null, Func<Task, Task> apply = null, Type messageType = null)
+        public int TryCount { get; set; }
+        public IBackoffProvider BackoffProvider { get; set; }
+        public MessageReceiver(TaskHandler receiver = null, TaskHandler applier = null, Type messageType = null)
         {
-            Receive = receive ?? Skip;
-            Apply = apply ?? Skip;
+            Receiver = receiver;
+            Applier = applier;
             MessageType = messageType;
         }
     }
 
     public static class MessageReceiverExtensions
     {
+        public static MessageReceiver<TMessage> Apply<TMessage>(this MessageReceiver<TMessage> receiver, Func<TMessage, Task> success, Func<Exception, Task> error = null, Func<Task> cancel = null)
+        {
+            receiver.Applier = new TaskHandler<TMessage>(t => success(t.Result), t => error(t.Exception), t => cancel());
+            return receiver;
+        }
+
         public static MessageReceiver<TMessage> Handle<TMessage, TResult>(this MessageReceiver<TMessage> receiver, Func<TMessage, Task<TResult>> success, Func<Exception, Task<TResult>> error = null, Func<Task<TResult>> cancel = null)
         {
-            receiver.Handler = new TaskHandler<TMessage, TResult>(t => success(t.Result), t => error(t.Exception), t => cancel()); ;
+            receiver.Handler = new TaskHandler<TMessage, TResult>(t => success(t.Result), t => error(t.Exception), t => cancel());
+            return receiver;
+        }
+
+        public static MessageReceiver<TMessage> WithRetries<TMessage>(this MessageReceiver<TMessage> receiver, int tryCount, IBackoffProvider backoffProvider)
+        {
+            receiver.TryCount = tryCount;
+            receiver.BackoffProvider = backoffProvider;
+            return receiver;
+        }
+
+        public static MessageReceiver<TMessage> WithRetries<TMessage>(this MessageReceiver<TMessage> receiver, int tryCount, TimeSpan delay)
+        {
+            receiver.TryCount = tryCount;
+            receiver.BackoffProvider = new FixedBackoff(delay);
             return receiver;
         }
     }

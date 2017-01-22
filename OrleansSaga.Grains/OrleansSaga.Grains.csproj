@@ -151,7 +151,8 @@
     <Compile Include="Model\TicketTaskInfo.cs" />
     <Compile Include="Model\TicketToolState.cs" />
     <Compile Include="PingPongGrain.cs" />
-    <Compile Include="SagaGrain.cs" />
+    <Compile Include="RailwayGrain.cs" />
+    <Compile Include="RailwayTestGrain.cs" />
     <Compile Include="Services\SimpleService.cs" />
     <Compile Include="SimpleGrain.cs" />
     <Compile Include="Startup.cs" />
