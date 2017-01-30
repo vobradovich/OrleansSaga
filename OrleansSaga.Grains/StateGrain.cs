@@ -14,7 +14,7 @@ namespace OrleansSaga.Grains
     {
         protected Queue<Func<TGrainState, TGrainState>> Tasks = new Queue<Func<TGrainState, TGrainState>>();
 
-        protected List<StateEvent> Events = new List<StateEvent>();
+        protected List<GrainEvent> Events = new List<GrainEvent>();
 
         protected List<StateCommand> Commands = new List<StateCommand>();
 
@@ -43,7 +43,7 @@ namespace OrleansSaga.Grains
             throw new NotImplementedException();
         }
 
-        public Task Raise(StateEvent<TGrainState> ev)
+        public Task Raise(GrainEvent<TGrainState> ev)
         {
             Events.Add(ev);
             CurrentState = ev.Data;

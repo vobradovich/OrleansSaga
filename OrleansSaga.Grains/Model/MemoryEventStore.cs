@@ -9,25 +9,25 @@ namespace OrleansSaga.Grains.Model
 {
     public class MemoryEventStore : IEventStore
     {
-        ConcurrentDictionary<long, List<StateEvent>> Events = new ConcurrentDictionary<long, List<StateEvent>>();
+        ConcurrentDictionary<long, List<GrainEvent>> Events = new ConcurrentDictionary<long, List<GrainEvent>>();
 
-        public Task<IEnumerable<StateEvent>> LoadEvents(long grainId)
+        public Task<IEnumerable<GrainEvent>> LoadEvents(long grainId)
         {
-            List<StateEvent> events = null;
+            List<GrainEvent> events = null;
             if (Events.ContainsKey(grainId) && Events.TryGetValue(grainId, out events))
             {
                 return Task.FromResult(events.AsEnumerable());
             }
-            return Task.FromResult(Enumerable.Empty<StateEvent>());
+            return Task.FromResult(Enumerable.Empty<GrainEvent>());
         }
 
-        public Task AddEvents(params StateEvent[] events)
+        public Task AddEvents(params GrainEvent[] events)
         {
             foreach (var ev in events)
             {
                 if (!Events.ContainsKey(ev.GrainId))
                 {
-                    Events.TryAdd(ev.GrainId, new List<StateEvent>());
+                    Events.TryAdd(ev.GrainId, new List<GrainEvent>());
                 }
                 Events[ev.GrainId].Add(ev);
             }

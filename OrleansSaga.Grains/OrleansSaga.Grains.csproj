@@ -35,6 +35,10 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Dapper, Version=1.50.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Dapper.1.50.2\lib\net451\Dapper.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.Extensions.DependencyInjection, Version=1.1.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Extensions.DependencyInjection.1.1.0\lib\netstandard1.1\Microsoft.Extensions.DependencyInjection.dll</HintPath>
       <Private>True</Private>
@@ -70,6 +74,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System.ComponentModel.Composition" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Console, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Console.4.3.0\lib\net46\System.Console.dll</HintPath>
       <Private>True</Private>
@@ -146,8 +151,9 @@
     <Compile Include="Model\IEventStore.cs" />
     <Compile Include="Model\IHandler.cs" />
     <Compile Include="Model\MemoryEventStore.cs" />
+    <Compile Include="Model\SqlEventStore.cs" />
     <Compile Include="Model\StateCommand.cs" />
-    <Compile Include="Model\StateEvent.cs" />
+    <Compile Include="Model\GrainEvent.cs" />
     <Compile Include="Model\TicketTaskInfo.cs" />
     <Compile Include="Model\TicketToolState.cs" />
     <Compile Include="PingPongGrain.cs" />

@@ -14,7 +14,8 @@ namespace OrleansSaga.Grains
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.AddSingleton<ISimpleService, SimpleService>();
-            services.AddSingleton<IEventStore, MemoryEventStore>();
+            //services.AddSingleton<IEventStore, MemoryEventStore>();
+            services.AddSingleton<IEventStore, SqlEventStore>();
 
             return services.BuildServiceProvider();
         }

@@ -16,7 +16,7 @@ namespace OrleansSaga.Grains
 
         public override Task OnActivateAsync()
         {
-            OnMessage<StartMessage>().Handle(HandleThrow).WithRetries(10, new FibonacciBackoff(TimeSpan.FromMilliseconds(100)));
+            OnMessage<StartMessage>().Handle(Handle).WithRetries(10, new FibonacciBackoff(TimeSpan.FromMilliseconds(100)));
             OnMessage<ProgressMessage>().Handle(Handle, HandleException);
             OnMessage<DoneMessage>().Apply(Apply);
 
@@ -40,7 +40,7 @@ namespace OrleansSaga.Grains
         {
             var grainId = this.GetPrimaryKeyLong();
             Console.WriteLine($"{DateTime.Now} {grainId} Handle ProgressMessage");
-            await Task.Delay(1000, CancellationTokenSource.Token);
+            await Task.Delay(10000, CancellationTokenSource.Token);
             return new DoneMessage();
         }
 
@@ -65,22 +65,11 @@ namespace OrleansSaga.Grains
             await Task.Delay(1000);
             throw ex;
         }
-
+         
         public async Task Apply(DoneMessage message)
         {
             var grainId = this.GetPrimaryKeyLong();
             Console.WriteLine($"{DateTime.Now} {grainId} Apply DoneMessage");
-
-            if (grainId < 100)
-            {
-                await GrainFactory.GetGrain<IRailwayTestGrain>(grainId + 10).Start();
-            }
-            else
-            {
-                await GrainFactory.GetGrain<IRailwayTestGrain>(grainId - 10).Start();
-            }
-            Console.WriteLine($"{DateTime.Now} {grainId} Done");
-            DeactivateOnIdle();
         }
     }
 

@@ -8,8 +8,8 @@ namespace OrleansSaga.Grains.Model
 {
     public interface IEventStore
     {
-        Task<IEnumerable<StateEvent>> LoadEvents(long grainId);
+        Task<IEnumerable<GrainEvent>> LoadEvents(long grainId);
 
-        Task AddEvents(params StateEvent[] events);
+        Task AddEvents(params GrainEvent[] events);
     }
 }

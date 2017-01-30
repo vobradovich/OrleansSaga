@@ -24,7 +24,7 @@ namespace OrleansSaga.Tests
             {
                 var handler = new TaskHandler<TMessage>(t => success(t.Result), t => error(t.Exception), t => cancel());
                 _handlers.Add(typeof(TMessage), handler);
-                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(StateEvent.FromMessage(0, t.Result)), t => EventStore.AddEvents(StateEvent.FromException<TMessage>(0, t.Exception)), t => EventStore.AddEvents(StateEvent.FromCancel<TMessage>(0)));
+                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(GrainEvent.FromMessage(0, t.Result)), t => EventStore.AddEvents(GrainEvent.FromException<TMessage>(0, t.Exception)), t => EventStore.AddEvents(GrainEvent.FromCancel<TMessage>(0)));
                 var logHandler = new TaskHandler<TMessage>(t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Result}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Exception}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t}")));
                 _receiverHandlers.Add(typeof(TMessage), new[] { logHandler, storeHandler });
             }
@@ -36,7 +36,7 @@ namespace OrleansSaga.Tests
             {
                 var handler = new TaskHandler<TMessage, TResult>(t => success(t.Result), t => error(t.Exception), t => cancel());
                 _handlers.Add(typeof(TMessage), handler);
-                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(StateEvent.FromMessage(0, t.Result)), t => EventStore.AddEvents(StateEvent.FromException<TMessage>(0, t.Exception)), t => EventStore.AddEvents(StateEvent.FromCancel<TMessage>(0)));
+                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(GrainEvent.FromMessage(0, t.Result)), t => EventStore.AddEvents(GrainEvent.FromException<TMessage>(0, t.Exception)), t => EventStore.AddEvents(GrainEvent.FromCancel<TMessage>(0)));
                 var logHandler = new TaskHandler<TMessage>(t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Result}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Exception}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t}")));
                 _receiverHandlers.Add(typeof(TMessage), new[] { logHandler, storeHandler });
             }
@@ -48,7 +48,7 @@ namespace OrleansSaga.Tests
             {
                 var handler = new TaskHandler<TMessage, TResult>(taskHandler);
                 _handlers.Add(typeof(TMessage), handler);
-                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(StateEvent.FromMessage(0, t.Result)), t => EventStore.AddEvents(StateEvent.FromException<TMessage>(0, t.Exception)), t => EventStore.AddEvents(StateEvent.FromCancel<TMessage>(0)));
+                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(GrainEvent.FromMessage(0, t.Result)), t => EventStore.AddEvents(GrainEvent.FromException<TMessage>(0, t.Exception)), t => EventStore.AddEvents(GrainEvent.FromCancel<TMessage>(0)));
                 var logHandler = new TaskHandler<TMessage>(t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Result}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Exception}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t}")));
                 _receiverHandlers.Add(typeof(TMessage), new[] { logHandler, storeHandler });
             }

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace OrleansSaga.Grains
 {
-    public class TaskHandler<TMessage, TResult> : TaskHandler<TMessage>
+    public class TaskHandler<TMessage, TResult> : TaskHandler<TMessage> where TMessage : class
     {
         public TaskHandler(Func<Task<TMessage>, Task<TResult>> onCompleted = null, Func<Task<TMessage>, Task<TResult>> onFaulted = null, Func<Task<TMessage>, Task<TResult>> onCanceled = null)
             : base(t => onCompleted(t), t => onFaulted(t), t => onCanceled(t), typeof(TResult))
@@ -21,7 +21,24 @@ namespace OrleansSaga.Grains
 
         }
 
-        public override Task Handle(Task task) => Handle(task as Task<TMessage>);
+        public override Task Handle(Task task)
+        {
+            if (task is Task<TMessage>)
+            {
+                return Handle(task as Task<TMessage>);
+            }
+            return Handle(task as Task<object>);
+        }
+
+        private Task<TResult> Handle(Task<object> task)
+        {
+            return task.ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    return Handle(Task.FromException<TMessage>(t.Exception));
+                return Handle(Task.FromResult(t.Result as TMessage));
+            }).Unwrap();
+        }
 
         public Task<TResult> Handle(Task<TMessage> task)
         {
@@ -39,26 +56,33 @@ namespace OrleansSaga.Grains
     }
 
 
-    public class TaskHandler<TMessage> : TaskHandler
+    public class TaskHandler<TMessage> : TaskHandler where TMessage : class
     {
         public TaskHandler(Func<Task<TMessage>, Task> onSuccess = null, Func<Task<TMessage>, Task> onFaulted = null, Func<Task<TMessage>, Task> onCanceled = null, Type resultType = null)
             : base((Task t) => onSuccess(t as Task<TMessage>), (Task t) => onFaulted(t as Task<TMessage>), (Task t) => onCanceled(t as Task<TMessage>), typeof(TMessage), resultType)
         {
         }
 
-        //public override Task Handle(Task task) => Handle(task as Task<TMessage>);
+        public override Task Handle(Task task)
+        {
+            if (task is Task<TMessage>)
+            {
+                return Handle(task as Task<TMessage>);
+            }
+            return Handle(task as Task<object>);
+        } 
 
-        //public virtual Task Handle(Task<TMessage> task) => base.Handle(task);
+        private Task Handle(Task<TMessage> task) => base.Handle(task);
 
-        //public virtual Task Handle(Task<TMessage> task)
-        //{
-        //    return task.ContinueWith(t =>
-        //    {
-        //        if (t.IsCompleted) return OnSuccess(t);
-        //        if (t.IsFaulted) return OnFaulted(t);
-        //        return OnCanceled(t);
-        //    }).Unwrap();
-        //}
+        private Task Handle(Task<object> task)
+        {
+            return task.ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    return base.Handle(Task.FromException<TMessage>(t.Exception));
+                return base.Handle(Task.FromResult(t.Result as TMessage));
+            }).Unwrap();
+        }
     }
 
     public class TaskHandler

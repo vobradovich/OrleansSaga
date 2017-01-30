@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using OrleansSaga.Grains.Model;
 
 namespace OrleansSaga.Grains
 {
-    public class MessageReceiver<TMessage> : MessageReceiver
+    public class MessageReceiver<TMessage> : MessageReceiver where TMessage : class
     {
         public MessageReceiver(TaskHandler<TMessage> receiver = null, TaskHandler<TMessage> applier = null)
             : base(receiver, applier, typeof(TMessage))
@@ -32,26 +33,26 @@ namespace OrleansSaga.Grains
 
     public static class MessageReceiverExtensions
     {
-        public static MessageReceiver<TMessage> Apply<TMessage>(this MessageReceiver<TMessage> receiver, Func<TMessage, Task> success, Func<Exception, Task> error = null, Func<Task> cancel = null)
+        public static MessageReceiver<TMessage> Apply<TMessage>(this MessageReceiver<TMessage> receiver, Func<TMessage, Task> success, Func<Exception, Task> error = null, Func<Task> cancel = null) where TMessage : class
         {
             receiver.Applier = new TaskHandler<TMessage>(t => success(t.Result), t => error(t.Exception), t => cancel());
             return receiver;
         }
 
-        public static MessageReceiver<TMessage> Handle<TMessage, TResult>(this MessageReceiver<TMessage> receiver, Func<TMessage, Task<TResult>> success, Func<Exception, Task<TResult>> error = null, Func<Task<TResult>> cancel = null)
+        public static MessageReceiver<TMessage> Handle<TMessage, TResult>(this MessageReceiver<TMessage> receiver, Func<TMessage, Task<TResult>> success, Func<Exception, Task<TResult>> error = null, Func<Task<TResult>> cancel = null) where TMessage : class
         {
             receiver.Handler = new TaskHandler<TMessage, TResult>(t => success(t.Result), t => error(t.Exception), t => cancel());
             return receiver;
         }
 
-        public static MessageReceiver<TMessage> WithRetries<TMessage>(this MessageReceiver<TMessage> receiver, int tryCount, IBackoffProvider backoffProvider)
+        public static MessageReceiver<TMessage> WithRetries<TMessage>(this MessageReceiver<TMessage> receiver, int tryCount, IBackoffProvider backoffProvider) where TMessage : class
         {
             receiver.TryCount = tryCount;
             receiver.BackoffProvider = backoffProvider;
             return receiver;
         }
 
-        public static MessageReceiver<TMessage> WithRetries<TMessage>(this MessageReceiver<TMessage> receiver, int tryCount, TimeSpan delay)
+        public static MessageReceiver<TMessage> WithRetries<TMessage>(this MessageReceiver<TMessage> receiver, int tryCount, TimeSpan delay) where TMessage : class
         {
             receiver.TryCount = tryCount;
             receiver.BackoffProvider = new FixedBackoff(delay);

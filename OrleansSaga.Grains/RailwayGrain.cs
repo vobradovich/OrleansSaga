@@ -27,7 +27,7 @@ namespace OrleansSaga.Grains
             OnMessage<CancelMessage>().Handle(HandleCancel);
             OnMessage<SagaCanceled>();
 
-            Log = GetLogger();
+            Log = GetLogger($"RailwayGrain-{this.GetPrimaryKeyLong()}");
             CancellationTokenSource = new CancellationTokenSource();
 
             var grainId = this.GetPrimaryKeyLong();
@@ -48,7 +48,7 @@ namespace OrleansSaga.Grains
         public async Task Receive(Task taskMessage, Type messageType)
         {
             var grainId = this.GetPrimaryKeyLong();
-            Console.WriteLine($"{DateTime.Now} {grainId} Receive {messageType}");
+            Log.Info($"Receive {messageType}");
             MessageReceiver receiver;
             if (!_receivers.TryGetValue(messageType, out receiver))
             {
@@ -67,7 +67,7 @@ namespace OrleansSaga.Grains
             await Task.Factory.StartNew(() => Dispatch(taskMessage, receiver, events));
         }
 
-        public Task Dispatch(Task taskMessage, MessageReceiver receiver, IEnumerable<StateEvent> events)
+        public Task Dispatch(Task taskMessage, MessageReceiver receiver, IEnumerable<GrainEvent> events)
         {
             if (receiver.Handler == null)
             {
@@ -85,8 +85,8 @@ namespace OrleansSaga.Grains
             else
             {
                 return Retry(taskMessage, receiver);
-                //var task = handler.Handle(taskMessage);
-                //return task.ContinueWith(t => Receive(t, handler.ResultType)).Unwrap();
+                //var task = receiver.Handler.Handle(taskMessage);
+                //return task.ContinueWith(t => Receive(t, receiver.Handler.ResultType)).Unwrap();
             }
         }
 
@@ -96,7 +96,7 @@ namespace OrleansSaga.Grains
             var delay = current == 0 ? TimeSpan.Zero : backoffProvider.Next(current);
             var callback = RetryCallback(taskMessage, current);
             Console.WriteLine($"{DateTime.Now} RegisterTimer {current} {receiver.MessageType} {delay}");
-            RegisterTimer(callback, receiver, delay, TimeSpan.FromDays(10));
+            RegisterTimer(callback, receiver, delay, TimeSpan.FromMilliseconds(-1));
             return TaskDone.Done;
         }
 
@@ -157,7 +157,7 @@ namespace OrleansSaga.Grains
             MessageReceiver receiver;
             if (!_receivers.TryGetValue(typeof(TMessage), out receiver))
             {
-                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(StateEvent.FromMessage(grainId, t.Result)), t => EventStore.AddEvents(StateEvent.FromException<TMessage>(grainId, t.Exception)), t => EventStore.AddEvents(StateEvent.FromCancel<TMessage>(grainId)));
+                var storeHandler = new TaskHandler<TMessage>(t => EventStore.AddEvents(GrainEvent.FromMessage(grainId, t.Result)), t => EventStore.AddEvents(GrainEvent.FromException<TMessage>(grainId, t.Exception)), t => EventStore.AddEvents(GrainEvent.FromCancel<TMessage>(grainId)));
                 //var logHandler = new TaskHandler<TMessage>(t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Result}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t.Exception}")), t => Task.Factory.StartNew(() => Console.WriteLine($"{DateTime.Now} {t}")));
                 receiver = new MessageReceiver<TMessage>(storeHandler, null);
                 _receivers.Add(typeof(TMessage), receiver);
@@ -165,7 +165,7 @@ namespace OrleansSaga.Grains
             return receiver as MessageReceiver<TMessage>;
         }
 
-        Task Replay(StateEvent resultEvent)
+        Task Replay(GrainEvent resultEvent)
         {
             Console.WriteLine($"{DateTime.Now} Replay {resultEvent.EventType}");
             var type = Type.GetType(resultEvent.EventType);
