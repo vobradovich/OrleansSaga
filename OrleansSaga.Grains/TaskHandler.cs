@@ -21,38 +21,58 @@ namespace OrleansSaga.Grains
 
         }
 
-        public override Task Handle(Task task)
-        {
-            if (task is Task<TMessage>)
-            {
-                return Handle(task as Task<TMessage>);
-            }
-            return Handle(task as Task<object>);
-        }
-
-        private Task<TResult> Handle(Task<object> task)
-        {
-            return task.ContinueWith(t =>
-            {
-                if (t.IsFaulted)
-                    return Handle(Task.FromException<TMessage>(t.Exception));
-                return Handle(Task.FromResult(t.Result as TMessage));
-            }).Unwrap();
-        }
+        public override Task Handle(Task task) => Handle(task as Task<TMessage>);
 
         public Task<TResult> Handle(Task<TMessage> task)
         {
-            return task.ContinueWith(t =>
+            if (task.IsCompleted)
             {
-                if (t.IsCanceled)
-                    return (OnCanceled(t) as Task<TResult>);
-
-                if (t.IsFaulted)
-                    return (OnFaulted(t) as Task<TResult>);
-
-                return (OnCompleted(t) as Task<TResult>);
-            }).Unwrap();
+                return HandleCompleted(task);
+            }
+            return task.ContinueWith(HandleCompleted).Unwrap();
         }
+
+        private Task<TResult> HandleCompleted(Task<TMessage> task)
+        {
+            if (task.IsCanceled)
+                return (OnCanceled(task) as Task<TResult>);
+            if (task.IsFaulted)
+                return (OnFaulted(task) as Task<TResult>);
+            return (OnCompleted(task) as Task<TResult>);
+        }
+
+        //public override Task Handle(Task task)
+        //{
+        //    if (task is Task<TMessage>)
+        //    {
+        //        return Handle(task as Task<TMessage>);
+        //    }
+        //    return Handle(task as Task<object>);
+        //}
+
+        //private Task<TResult> Handle(Task<object> task)
+        //{
+        //    return task.ContinueWith(t =>
+        //    {
+        //        if (t.IsFaulted)
+        //            return Handle(Task.FromException<TMessage>(t.Exception));
+        //        return Handle(Task.FromResult(t.Result as TMessage));
+        //    }).Unwrap();
+        //}
+
+        //public Task<TResult> Handle(Task<TMessage> task)
+        //{
+        //    return task.ContinueWith(t =>
+        //    {
+        //        if (t.IsCanceled)
+        //            return (OnCanceled(t) as Task<TResult>);
+
+        //        if (t.IsFaulted)
+        //            return (OnFaulted(t) as Task<TResult>);
+
+        //        return (OnCompleted(t) as Task<TResult>);
+        //    }).Unwrap();
+        //}
     }
 
 
@@ -63,26 +83,26 @@ namespace OrleansSaga.Grains
         {
         }
 
-        public override Task Handle(Task task)
-        {
-            if (task is Task<TMessage>)
-            {
-                return Handle(task as Task<TMessage>);
-            }
-            return Handle(task as Task<object>);
-        } 
+        //public override Task Handle(Task task)
+        //{
+        //    if (task is Task<TMessage>)
+        //    {
+        //        return Handle(task as Task<TMessage>);
+        //    }
+        //    return Handle(task as Task<object>);
+        //} 
 
-        private Task Handle(Task<TMessage> task) => base.Handle(task);
+        //private Task Handle(Task<TMessage> task) => base.Handle(task);
 
-        private Task Handle(Task<object> task)
-        {
-            return task.ContinueWith(t =>
-            {
-                if (t.IsFaulted)
-                    return base.Handle(Task.FromException<TMessage>(t.Exception));
-                return base.Handle(Task.FromResult(t.Result as TMessage));
-            }).Unwrap();
-        }
+        //private Task Handle(Task<object> task)
+        //{
+        //    return task.ContinueWith(t =>
+        //    {
+        //        if (t.IsFaulted)
+        //            return base.Handle(Task.FromException<TMessage>(t.Exception));
+        //        return base.Handle(Task.FromResult(t.Result as TMessage));
+        //    }).Unwrap();
+        //}
     }
 
     public class TaskHandler
@@ -111,16 +131,20 @@ namespace OrleansSaga.Grains
 
         public virtual Task Handle(Task task)
         {
-            return task.ContinueWith(t =>
+            if (task.IsCompleted)
             {
-                if (t.IsCanceled)
-                    return OnCanceled(t);
+                return HandleCompleted(task);
+            }
+            return task.ContinueWith(HandleCompleted).Unwrap();
+        }
 
-                if (t.IsFaulted)
-                    return OnFaulted(t);
-
-                return OnCompleted(t);
-            }).Unwrap();
+        private Task HandleCompleted(Task task)
+        {
+            if (task.IsCanceled)
+                return OnCanceled(task);
+            if (task.IsFaulted)
+                return OnFaulted(task);
+            return OnCompleted(task);
         }
     }
 }

@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using OrleansSaga.Grains.Model;
 
@@ -12,6 +10,20 @@ namespace OrleansSaga.Grains
         public MessageReceiver(TaskHandler<TMessage> receiver = null, TaskHandler<TMessage> applier = null)
             : base(receiver, applier, typeof(TMessage))
         {
+        }
+
+        public override Task FromEvent(GrainEvent resultEvent, CancellationToken token)
+        {
+            switch (resultEvent.TaskStatus)
+            {
+                case TaskStatus.Canceled:
+                    return Task.FromCanceled<TMessage>(token);
+                case TaskStatus.Faulted:
+                    return Task.FromException<TMessage>(resultEvent.GetData<Exception>());
+                case TaskStatus.RanToCompletion:
+                default:
+                    return Task.FromResult<TMessage>(resultEvent.GetData<TMessage>());
+            }
         }
     }
 
@@ -28,6 +40,20 @@ namespace OrleansSaga.Grains
             Receiver = receiver;
             Applier = applier;
             MessageType = messageType;
+        }
+
+        public virtual Task FromEvent(GrainEvent resultEvent, CancellationToken token)
+        {
+            switch (resultEvent.TaskStatus)
+            {
+                case TaskStatus.Canceled:
+                    return Task.FromCanceled(token);
+                case TaskStatus.Faulted:
+                    return Task.FromException(resultEvent.GetData<Exception>());
+                case TaskStatus.RanToCompletion:
+                default:
+                    return Task.FromResult(resultEvent.GetData());
+            }
         }
     }
 

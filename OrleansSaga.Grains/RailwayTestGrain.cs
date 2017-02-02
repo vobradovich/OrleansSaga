@@ -16,11 +16,18 @@ namespace OrleansSaga.Grains
 
         public override Task OnActivateAsync()
         {
-            OnMessage<StartMessage>().Handle(Handle).WithRetries(10, new FibonacciBackoff(TimeSpan.FromMilliseconds(100)));
+            OnMessage<StartMessage>().Handle(HandleThrow).WithRetries(10, new FibonacciBackoff(TimeSpan.FromMilliseconds(100)));
             OnMessage<ProgressMessage>().Handle(Handle, HandleException);
             OnMessage<DoneMessage>().Apply(Apply);
+            OnMessage<ErrorMessage>().Apply(ApplyError);
 
             return base.OnActivateAsync();
+        }
+
+        public async Task ApplyError(ErrorMessage arg)
+        {
+            var grainId = this.GetPrimaryKeyLong();
+            Console.WriteLine($"{DateTime.Now} {grainId} ApplyError");
         }
 
         public Task Start()
@@ -87,6 +94,10 @@ namespace OrleansSaga.Grains
     }
 
     public class DoneMessage
+    {
+    }
+
+    public class ErrorMessage
     {
     }
 }

@@ -47,14 +47,18 @@ namespace OrleansSaga.Grains
 
         public async Task Receive(Task taskMessage, Type messageType)
         {
-            var grainId = this.GetPrimaryKeyLong();
-            Log.Info($"Receive {messageType}");
             MessageReceiver receiver;
             if (!_receivers.TryGetValue(messageType, out receiver))
             {
                 throw new NotImplementedException();
             }
-            
+            await Receive(taskMessage, messageType, receiver);
+        }
+
+        public async Task Receive(Task taskMessage, Type messageType, MessageReceiver receiver)
+        {
+            var grainId = this.GetPrimaryKeyLong();
+            Log.Info($"Receive {messageType}");
             var events = await EventStore.LoadEvents(grainId);
             if (receiver.Receiver !=null && !events.Any(e => e.EventType == messageType.FullName))
             {
@@ -167,18 +171,15 @@ namespace OrleansSaga.Grains
 
         Task Replay(GrainEvent resultEvent)
         {
-            Console.WriteLine($"{DateTime.Now} Replay {resultEvent.EventType}");
-            var type = Type.GetType(resultEvent.EventType);
-            switch (resultEvent.TaskStatus)
+            Log.Info($"Replay {resultEvent.EventType}");
+            var messageType = Type.GetType(resultEvent.EventType);
+            MessageReceiver receiver;
+            if (!_receivers.TryGetValue(messageType, out receiver))
             {
-                case TaskStatus.Canceled:
-                    return Receive(Task.FromCanceled(CancellationTokenSource.Token), type);
-                case TaskStatus.Faulted:
-                    return Receive(Task.FromException(resultEvent.GetData<Exception>()), type);
-                case TaskStatus.RanToCompletion:
-                default:
-                    return Receive(Task.FromResult(resultEvent.GetData()), type);
+                throw new NotImplementedException();
             }
+            var taskMessage = receiver.FromEvent(resultEvent, CancellationTokenSource.Token);
+            return Receive(taskMessage, messageType, receiver);
         }
 
         public Task ReceiveReminder(string reminderName, TickStatus status)
