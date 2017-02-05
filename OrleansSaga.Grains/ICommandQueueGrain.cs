@@ -4,8 +4,8 @@ using OrleansSaga.Grains.Model;
 
 namespace OrleansSaga.Grains
 {
-    public interface IQueueGrain : IGrainWithGuidKey
+    public interface ICommandQueueGrain : IGrainWithGuidKey
     {
-        Task Enqueue(GrainCommand command);
+        Task Add(GrainCommand command);
     }
 }

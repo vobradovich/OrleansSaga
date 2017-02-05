@@ -146,7 +146,7 @@
   <ItemGroup>
     <Compile Include="Bootstrap.cs" />
     <Compile Include="CommandDispatcher.cs" />
-    <Compile Include="IQueueGrain.cs" />
+    <Compile Include="ICommandQueueGrain.cs" />
     <Compile Include="ISagaGrain.cs" />
     <Compile Include="MessageReceiver.cs" />
     <Compile Include="Model\CancelMessage.cs" />
@@ -161,7 +161,7 @@
     <Compile Include="Model\TicketTaskInfo.cs" />
     <Compile Include="Model\TicketToolState.cs" />
     <Compile Include="PingPongGrain.cs" />
-    <Compile Include="QueueGrain.cs" />
+    <Compile Include="CommandQueueGrain.cs" />
     <Compile Include="RailwayGrain.cs" />
     <Compile Include="RailwayTestGrain.cs" />
     <Compile Include="Services\SimpleService.cs" />
