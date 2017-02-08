@@ -85,18 +85,22 @@ namespace OrleansSaga.Grains
         Task Start();
     }
 
+    [Serializable]
     public class StartMessage
     {
     }
 
+    [Serializable]
     public class ProgressMessage
     {
     }
 
+    [Serializable]
     public class DoneMessage
     {
     }
 
+    [Serializable]
     public class ErrorMessage
     {
     }

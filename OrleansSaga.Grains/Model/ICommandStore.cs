@@ -1,16 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace OrleansSaga.Grains.Model
 {
     public interface ICommandStore
     {
-        Task<GrainCommandQueue[]> GetQueuedCommands(Guid queueId);
+        Task<IEnumerable<GrainCommandQueue>> GetQueuedCommands(Guid queueId);
         Task<GrainCommand> Get(long commandId);
         Task Add(params GrainCommand[] commands);
-        Task<GrainCommandQueue> Enqueue(GrainCommand command);
-        Task<GrainCommandQueue> Enqueue(GrainCommand command, DateTime startDate, long tryCount);
-        Task Complete(GrainCommand command);
-        Task Fail(GrainCommand command, Exception ex);
+        Task<GrainCommandQueue> Enqueue(GrainCommand command, DateTime startDate, int tryCount);
+        Task Complete(GrainCommandQueue commandQueue);
+        Task Fail(GrainCommandQueue commandQueue, Exception ex);
     }
 }

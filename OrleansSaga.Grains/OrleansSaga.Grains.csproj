@@ -155,6 +155,7 @@
     <Compile Include="Model\IEventStore.cs" />
     <Compile Include="Model\IHandler.cs" />
     <Compile Include="Model\MemoryEventStore.cs" />
+    <Compile Include="Model\SqlCommandStore.cs" />
     <Compile Include="Model\SqlEventStore.cs" />
     <Compile Include="Model\StateCommand.cs" />
     <Compile Include="Model\GrainEvent.cs" />

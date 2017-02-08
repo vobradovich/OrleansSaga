@@ -23,7 +23,7 @@ namespace OrleansSaga.Grains
             return TaskDone.Done;
         }
 
-        public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
+        public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             //var simpleGrain = providerRuntime.GrainFactory.GetGrain<ISimpleGrain>(0);
             //simpleGrain.Run("TEST!!!!!!");
@@ -31,14 +31,27 @@ namespace OrleansSaga.Grains
             //var simpleGrain = providerRuntime.GrainFactory.GetGrain<IManagerGrain>(0);
             //simpleGrain.Run(50, 100000);
 
-            for (int i = 0; i < 1; i++)
-            {
-                var railwayTestGrain = providerRuntime.GrainFactory.GetGrain<IRailwayTestGrain>(i);
-                railwayTestGrain.Start();
+            //for (int i = 0; i < 1; i++)
+            //{
+            //    var railwayTestGrain = providerRuntime.GrainFactory.GetGrain<IRailwayTestGrain>(i);
+            //    railwayTestGrain.Start();
 
-            }            
+            //}            
 
-            return TaskDone.Done;
+            var queueGrain = providerRuntime.GrainFactory.GetGrain<ICommandQueueGrain>(Guid.Empty);
+            //await queueGrain.Register(typeof(StartMessage), o => {
+            //    return TaskDone.Done;
+            //});
+            //await queueGrain.Register(typeof(ProgressMessage), o => {
+            //    return TaskDone.Done;
+            //});
+            //await queueGrain.Register(typeof(DoneMessage), o => {
+            //    return TaskDone.Done;
+            //});
+            await queueGrain.Start(TimeSpan.FromSeconds(1));
+            await queueGrain.Add(new StartMessage());
+
+            //return TaskDone.Done;
         }
     }
 }

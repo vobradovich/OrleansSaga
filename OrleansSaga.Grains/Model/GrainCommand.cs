@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 
 namespace OrleansSaga.Grains.Model
 {
-    public class GrainCommand<T> : GrainCommand where T : class, new()
+    public class GrainCommand<T> : GrainCommand where T : class
     {
         private T _data;
 

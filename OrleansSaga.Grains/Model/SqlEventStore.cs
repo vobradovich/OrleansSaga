@@ -17,7 +17,7 @@ namespace OrleansSaga.Grains.Model
         string _connectionString;
         public SqlEventStore()
         {
-            _connectionString = ConfigurationManager.ConnectionStrings["GrainEventStore"].ConnectionString;            
+            _connectionString = ConfigurationManager.ConnectionStrings["GrainEventStore"].ConnectionString;
         }
 
         public async Task AddEvents(params GrainEvent[] events)
