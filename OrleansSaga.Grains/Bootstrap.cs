@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers;
+using OrleansSaga.Grains.Queue;
 
 namespace OrleansSaga.Grains
 {
@@ -20,7 +21,7 @@ namespace OrleansSaga.Grains
 
         public Task Close()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
@@ -38,7 +39,7 @@ namespace OrleansSaga.Grains
 
             //}            
 
-            var queueGrain = providerRuntime.GrainFactory.GetGrain<ICommandQueueGrain>(Guid.Empty);
+            //var queueGrain = providerRuntime.GrainFactory.GetGrain<ICommandQueueGrain>(Guid.Empty);
             //await queueGrain.Register(typeof(StartMessage), o => {
             //    return TaskDone.Done;
             //});
@@ -48,8 +49,14 @@ namespace OrleansSaga.Grains
             //await queueGrain.Register(typeof(DoneMessage), o => {
             //    return TaskDone.Done;
             //});
-            await queueGrain.Start(TimeSpan.FromSeconds(1));
-            await queueGrain.Add(new StartMessage());
+            //await queueGrain.Start(TimeSpan.FromSeconds(1));
+            //await queueGrain.Add(new StartMessage());
+
+            for (int q = 0; q < 1000; q++)
+            {
+                var queueGrain = providerRuntime.GrainFactory.GetGrain<IRequeueGrain>($"TestQueue{q}");
+                Task.Factory.StartNew(() => queueGrain.Enqueue(Enumerable.Range(0, 1 * 100).Select(i => new Model.GrainCommand { CommandId = i }).ToArray()));
+            }
 
             //return TaskDone.Done;
         }

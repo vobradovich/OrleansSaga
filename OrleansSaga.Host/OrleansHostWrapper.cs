@@ -142,7 +142,6 @@ namespace OrleansSaga.Host
             config.UseStartupType<Startup>();
             config.Globals.RegisterBootstrapProvider<Bootstrap>("OrleansSaga");
 
-
             siloHost = new SiloHost(siloName, config);
 
             if (deploymentId != null)
