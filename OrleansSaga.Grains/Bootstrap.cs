@@ -52,10 +52,12 @@ namespace OrleansSaga.Grains
             //await queueGrain.Start(TimeSpan.FromSeconds(1));
             //await queueGrain.Add(new StartMessage());
 
-            for (int q = 0; q < 1000; q++)
+            DateTimeOffset offset = DateTimeOffset.Now.AddSeconds(10);
+
+            for (int q = 0; q < 100; q++)
             {
                 var queueGrain = providerRuntime.GrainFactory.GetGrain<IRequeueGrain>($"TestQueue{q}");
-                Task.Factory.StartNew(() => queueGrain.Enqueue(Enumerable.Range(0, 1 * 100).Select(i => new Model.GrainCommand { CommandId = i }).ToArray()));
+                await queueGrain.Schedule(offset, Enumerable.Range(0, 1 * 100).Select(i => (long)i).ToArray());
             }
 
             //return TaskDone.Done;

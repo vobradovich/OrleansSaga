@@ -11,12 +11,11 @@ namespace OrleansSaga.Grains.Queue
     public class RequeueGrain : Grain, IRequeueGrain
     {
         protected Logger Log { get; set; }
-        protected Queue<GrainCommand> CurrentQueue { get; private set; } = new Queue<GrainCommand>();
-        protected Dictionary<GrainCommand, DateTimeOffset> Scheduled { get; private set; } = new Dictionary<GrainCommand, DateTimeOffset>();
         protected IDisposable Timer { get; set; }
         protected Stack<IRequeueWorkerGrain> WorkerPool { get; private set; } = new Stack<IRequeueWorkerGrain>();
-        protected Dictionary<IRequeueWorkerGrain, GrainCommand> WorkerAssigned { get; private set; } = new Dictionary<IRequeueWorkerGrain, GrainCommand>();
-        protected List<GrainCommand> CompleteCommands { get; private set; } = new List<GrainCommand>();
+        protected RequeueStore Store { get; set; }
+        protected IBackoffProvider BackoffProvider { get; set; }
+        protected int MaxTryCount { get; set; } = 5;
 
         public RequeueGrain()
         {
@@ -29,11 +28,13 @@ namespace OrleansSaga.Grains.Queue
             Log = GetLogger($"RequeueGrain-{grainId}");
             var interval = TimeSpan.FromSeconds(5);
             Timer = RegisterTimer(SchedulerCallback, null, TimeSpan.Zero, interval);
-            for (long i = 0; i < 1; i++)
+            for (long i = 0; i < 10; i++)
             {
                 var worker = GrainFactory.GetGrain<IRequeueWorkerGrain>(i, grainId, null);
                 WorkerPool.Push(worker);
             }
+            Store = new RequeueStore(grainId);
+            BackoffProvider = new FibonacciBackoff(TimeSpan.FromSeconds(5));
             await base.OnActivateAsync();
         }
 
@@ -48,16 +49,10 @@ namespace OrleansSaga.Grains.Queue
             return base.OnDeactivateAsync();
         }
 
-        public async Task Enqueue(params GrainCommand[] commands)
+        public async Task Enqueue(params long[] commandIds)
         {
-            commands
-                .ToList()
-                .ForEach(c =>
-                {
-                    //Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Enqueue Command {c.CommandId}");
-                    CurrentQueue.Enqueue(c);
-                });
-            while (WorkerPool.Count > 0 && CurrentQueue.Count > 0)
+            await Store.Enqueue(commandIds);
+            while (Store.Queued.Count > 0 && WorkerPool.Count > 0)
             {
                 var worker = WorkerPool.Pop();
                 //Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} WorkerPool Pop {worker.GetPrimaryKey(out string s)}");
@@ -65,82 +60,88 @@ namespace OrleansSaga.Grains.Queue
             }
         }
 
-        public Task<GrainCommand> Dequeue(IRequeueWorkerGrain worker)
+        public async Task<long?> Dequeue(IRequeueWorkerGrain worker)
         {
-            if (WorkerAssigned.ContainsKey(worker))
-            {
-                WorkerAssigned.Remove(worker);
-            }
-            if (CurrentQueue.Count == 0)
+            var command = await Store.Dequeue(worker.GetPrimaryKeyLong(out string s));
+            if (command == null)
             {
                 //Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} WorkerPool Push {worker.GetPrimaryKey(out string s1)}");
                 WorkerPool.Push(worker);
-                return Task.FromResult(null as GrainCommand);
+                return null as long?;
             }
-            var command = CurrentQueue.Dequeue();
-            WorkerAssigned.Add(worker, command);
             //Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Assign Command {command.CommandId} Worker {worker.GetPrimaryKey(out string s)}");
-            return Task.FromResult(command);
+            return command.CommandId;
         }
 
-        public async Task Complete(GrainCommand command, IRequeueWorkerGrain worker)
+        public async Task Complete(long commandId, IRequeueWorkerGrain worker)
         {
             //Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Complete Command {command.CommandId} Worker {worker.GetPrimaryKey(out string s)}");
-            if (WorkerAssigned.ContainsKey(worker))
-            {
-                WorkerAssigned.Remove(worker);
-            }
-            CompleteCommands.Add(command);
+            await Store.Complete(commandId, worker.GetPrimaryKeyLong(out string s));
         }
 
-        public Task Schedule(GrainCommand command, TimeSpan timeSpan)
+        public async Task Fail(long commandId, IRequeueWorkerGrain worker, string reason)
         {
-            return Schedule(command, DateTimeOffset.Now.Add(timeSpan));
+            var workerId = worker.GetPrimaryKeyLong(out string s);
+            Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Fail Command {commandId} Worker {workerId}");
+            var assigned = Store.Assigned.Find(c => c.CommandId == commandId);
+            if ((assigned?.TryCount + 1 ?? 0) > MaxTryCount)
+            {
+                await Store.Fail(commandId, workerId, reason);
+                return;
+            }
+            Log.Info($"RequeueGrain {assigned}");
+            var delay = BackoffProvider.Next(assigned.TryCount + 1);
+            await Schedule(delay, commandId);
         }
 
-        public Task Schedule(GrainCommand command, DateTimeOffset dateTime)
+        public Task Schedule(TimeSpan timeSpan, params long[] commandIds)
+        {
+            return Schedule(DateTimeOffset.Now.Add(timeSpan), commandIds);
+        }
+
+        public Task Schedule(DateTimeOffset dateTime, params long[] commandIds)
         {
             if (dateTime <= DateTimeOffset.Now)
             {
-                return Enqueue(command);
+                return Enqueue(commandIds);
             }
-            if (!Scheduled.ContainsKey(command))
-            {
-                //Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Schedule Command {command.CommandId}");
-                Scheduled.Add(command, dateTime);
-            }
-            return Task.CompletedTask;
+            return Store.Schedule(dateTime, commandIds);
         }
 
-        protected Task SchedulerCallback(object state)
+        protected async Task SchedulerCallback(object state)
         {
             try
             {
-                Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Stats - Enqueued: {CurrentQueue.Count}, Scheduled: {Scheduled.Count}, Completed: {CompleteCommands.Count}, Worker Pool: {WorkerPool.Count}, Assigned: {WorkerAssigned.Count}");
-                var enqueue = Scheduled.Where(k => k.Value <= DateTimeOffset.Now).Select(k => k.Key).ToList();
-                enqueue.ForEach(c => Scheduled.Remove(c));
-                if (CurrentQueue.Count > 0 || Scheduled.Count > 0)
+                Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Stats - Enqueued: {Store.Queued.Count}, Scheduled: {Store.Scheduled.Count}, Finished: {Store.Finished.Count}, Worker Pool: {WorkerPool.Count}, Assigned: {Store.Assigned.Count}");
+                var enqueue = await Store.GetScheduled(DateTimeOffset.Now);
+                if (enqueue.Count() > 0)
                 {
-                    return Enqueue(enqueue.ToArray());
+                    await Enqueue(enqueue);
                 }
-                DeactivateOnIdle();
-                //return Task.WhenAll(WorkerPool.Select(w => w.Stop(this)));
-                return Task.CompletedTask;
+                //if(Store.Queued.Count > 0)
+                //{
+                //    DelayDeactivation(TimeSpan.FromMinutes(5));
+                //}
+                //if (Store.Queued.Count == 0 && Store.Scheduled.Count == 0)
+                //{
+                //    DeactivateOnIdle();
+                //}                
+                //return Task.WhenAll(WorkerPool.Select(w => w.Stop(this)));                
             }
             catch (Exception ex)
             {
                 Log.Error(0, $"RequeueGrain {this.GetPrimaryKeyString()} Exception", ex);
-                return Task.CompletedTask;
             }
         }
     }
 
     public interface IRequeueGrain : IGrainWithStringKey
     {
-        Task<GrainCommand> Dequeue(IRequeueWorkerGrain worker);
-        Task Complete(GrainCommand command, IRequeueWorkerGrain worker);
-        Task Enqueue(params GrainCommand[] commands);
-        Task Schedule(GrainCommand command, TimeSpan timeSpan);
-        Task Schedule(GrainCommand command, DateTimeOffset dateTime);
+        Task<long?> Dequeue(IRequeueWorkerGrain worker);
+        Task Complete(long commandId, IRequeueWorkerGrain worker);
+        Task Fail(long commandId, IRequeueWorkerGrain worker, string reason);
+        Task Enqueue(params long[] commandIds);
+        Task Schedule(TimeSpan timeSpan, params long[] commandIds);
+        Task Schedule(DateTimeOffset dateTime, params long[] commandIds);
     }
 }

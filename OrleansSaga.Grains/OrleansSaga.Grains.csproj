@@ -151,11 +151,13 @@
     <Compile Include="ISagaGrain.cs" />
     <Compile Include="MessageReceiver.cs" />
     <Compile Include="Model\CancelMessage.cs" />
+    <Compile Include="Model\RequeueCommand.cs" />
     <Compile Include="Model\GrainCommand.cs" />
     <Compile Include="Model\ICommandStore.cs" />
     <Compile Include="Model\IEventStore.cs" />
     <Compile Include="Model\IHandler.cs" />
     <Compile Include="Model\MemoryEventStore.cs" />
+    <Compile Include="Model\RequeueStore.cs" />
     <Compile Include="Model\SqlCommandStore.cs" />
     <Compile Include="Model\SqlEventStore.cs" />
     <Compile Include="Model\StateCommand.cs" />

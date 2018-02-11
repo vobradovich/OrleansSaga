@@ -2,7 +2,6 @@
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using OrleansSaga.Grains.Model;
 
 namespace OrleansSaga.Grains.Queue
 {
@@ -13,7 +12,8 @@ namespace OrleansSaga.Grains.Queue
 
         public override async Task OnActivateAsync()
         {
-            Log = GetLogger($"RequeueWorkerGrain-{this.GetPrimaryKey(out string s)}");
+            var key = this.GetPrimaryKeyLong(out string s);
+            Log = GetLogger($"RequeueWorkerGrain-{s}-{key}");
             await base.OnActivateAsync();
         }
 
@@ -28,7 +28,8 @@ namespace OrleansSaga.Grains.Queue
             {
                 return Task.CompletedTask;
             }
-            Timer = RegisterTimer(StartCallback, requeueGrain, TimeSpan.Zero, TimeSpan.FromMilliseconds(-1));
+            //Timer = RegisterTimer(StartCallback, requeueGrain, TimeSpan.Zero, TimeSpan.FromMilliseconds(-1));
+            StartCallback(requeueGrain).Ignore();
             return Task.CompletedTask;
         }
 
@@ -43,31 +44,45 @@ namespace OrleansSaga.Grains.Queue
             try
             {
                 var requeueGrain = state as IRequeueGrain;
-                for (var command = await requeueGrain.Dequeue(this); command != null; command = await requeueGrain.Dequeue(this))
+                for (var commandId = await requeueGrain.Dequeue(this); commandId.HasValue; commandId = await requeueGrain.Dequeue(this))
                 {
-                    await Execute(requeueGrain, command);
+                    await Execute(requeueGrain, commandId.Value);
                 }
+            }
+            catch(Exception ex)
+            {
+                Log.Error(0, $"Exception {ex}");
+                //Console.ReadKey();
             }
             finally
             {
-                Timer.Dispose();
-                Timer = null;
+                if (Timer != null)
+                {
+                    Timer.Dispose();
+                    Timer = null;
+                }
             }
         }
 
-        public async Task Execute(IRequeueGrain requeueGrain, GrainCommand command)
+        public async Task Execute(IRequeueGrain requeueGrain, long commandId)
         {
             try
             {
-                Log.Info($"Worker execute Command {command.CommandId}");
-                await Task.Delay(10);
+                Log.Info($"Execute Command {commandId}");
+                var delay = new Random().Next(100, 500);
+                await Task.Delay(delay);
+                if (commandId % 7 == 0)
+                {
+                    throw new Exception("Test");
+                }
                 //await requeueGrain.Schedule(new GrainCommand { CommandId = command.CommandId + 1000 }, TimeSpan.FromSeconds(10));
-                await requeueGrain.Complete(command, this);
+                await requeueGrain.Complete(commandId, this);
+                //await requeueGrain.Enqueue(commandId + 100000);
             }
             catch (Exception ex)
             {
-                Log.Info($"Worker execute Command {command.CommandId} Exception: {ex}");
-                await requeueGrain.Schedule(command, TimeSpan.FromSeconds(10));
+                Log.Error(0, $"Worker execute Command {commandId} Exception: {ex}");
+                await requeueGrain.Fail(commandId, this, ex.ToString());
             }
         }
     }
