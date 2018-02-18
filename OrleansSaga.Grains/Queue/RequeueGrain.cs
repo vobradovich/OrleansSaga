@@ -28,12 +28,12 @@ namespace OrleansSaga.Grains.Queue
             Log = GetLogger($"RequeueGrain-{grainId}");
             var interval = TimeSpan.FromSeconds(5);
             Timer = RegisterTimer(SchedulerCallback, null, TimeSpan.Zero, interval);
-            for (long i = 0; i < 10; i++)
+            for (long i = 0; i < 1; i++)
             {
                 var worker = GrainFactory.GetGrain<IRequeueWorkerGrain>(i, grainId, null);
                 WorkerPool.Push(worker);
             }
-            Store = new RequeueStore(grainId);
+            Store = new SqlRequeueStore(grainId);
             BackoffProvider = new FibonacciBackoff(TimeSpan.FromSeconds(5));
             await base.OnActivateAsync();
         }

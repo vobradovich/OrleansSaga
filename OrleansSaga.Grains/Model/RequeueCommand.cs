@@ -63,8 +63,8 @@ namespace OrleansSaga.Grains.Model
         public string QueueId { get; set; }
         public long CommandId { get; set; }
         public int TryCount { get; set; } = 0;
-        public DateTimeOffset Created { get; set; } = DateTimeOffset.Now;
-        public DateTimeOffset Scheduled { get; set; }
+        public DateTimeOffset Scheduled { get; set; } = DateTimeOffset.Now;
+        public DateTimeOffset RunAt { get; set; }
         public override string ToString() => $"CommandId: {CommandId}, QueueId: {QueueId}, Scheduled: {Scheduled}, TryCount: {TryCount}";
     }
 

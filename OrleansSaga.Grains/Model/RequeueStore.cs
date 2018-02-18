@@ -19,7 +19,7 @@ namespace OrleansSaga.Grains.Model
         public List<RequeueCommandFinished> Finished { get; } = new List<RequeueCommandFinished>();
         public List<RequeueCommandAssigned> Assigned { get; } = new List<RequeueCommandAssigned>();
 
-        public Task<RequeueCommandAssigned> Dequeue(long workerId)
+        public virtual Task<RequeueCommandAssigned> Dequeue(long workerId)
         {
             Assigned.RemoveAll(a => a.WorkerId == workerId);
             if (Queued.Count > 0)
@@ -32,7 +32,7 @@ namespace OrleansSaga.Grains.Model
             return Task.FromResult(null as RequeueCommandAssigned);
         }
 
-        public Task Enqueue(params long[] commandIds)
+        public virtual Task Enqueue(params long[] commandIds)
         {
             foreach (var commandId in commandIds)
             {
@@ -43,7 +43,7 @@ namespace OrleansSaga.Grains.Model
             return Task.CompletedTask;
         }
 
-        public Task Schedule(DateTimeOffset dateTime, params long[] commandIds)
+        public virtual Task Schedule(DateTimeOffset dateTime, params long[] commandIds)
         {
             foreach (var commandId in commandIds)
             {
@@ -54,7 +54,7 @@ namespace OrleansSaga.Grains.Model
             return Task.CompletedTask;
         }
 
-        public Task Complete(long commandId, long workerId)
+        public virtual Task Complete(long commandId, long workerId)
         {
             var assigned = Assigned.Find(a => a.CommandId == commandId);
             Assigned.RemoveAll(a => a.CommandId == commandId);
@@ -62,7 +62,7 @@ namespace OrleansSaga.Grains.Model
             return Task.CompletedTask;
         }
 
-        public Task Fail(long commandId, long workerId, string reason)
+        public virtual Task Fail(long commandId, long workerId, string reason)
         {
             var assigned = Assigned.Find(a => a.CommandId == commandId);
             Assigned.RemoveAll(a => a.CommandId == commandId);
@@ -73,8 +73,10 @@ namespace OrleansSaga.Grains.Model
         public Task<long[]> GetScheduled(DateTimeOffset dateTime)
         {
             var scheduled = Scheduled
-                .Where(k => k.Scheduled <= dateTime)
-                .Select(c => c.CommandId).ToArray();
+                .Where(k => k.RunAt <= dateTime)
+                .Select(c => c.CommandId)
+                .Take(100)
+                .ToArray();
             return Task.FromResult(scheduled);
         }
     }

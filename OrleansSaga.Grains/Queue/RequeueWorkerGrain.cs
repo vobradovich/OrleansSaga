@@ -71,11 +71,10 @@ namespace OrleansSaga.Grains.Queue
                 Log.Info($"Execute Command {commandId}");
                 var delay = new Random().Next(100, 500);
                 await Task.Delay(delay);
-                if (commandId % 7 == 0)
-                {
-                    throw new Exception("Test");
-                }
-                //await requeueGrain.Schedule(new GrainCommand { CommandId = command.CommandId + 1000 }, TimeSpan.FromSeconds(10));
+                //if (commandId % 7 == 0)
+                //{
+                //    throw new Exception("test");
+                //}
                 await requeueGrain.Complete(commandId, this);
                 //await requeueGrain.Enqueue(commandId + 100000);
             }
