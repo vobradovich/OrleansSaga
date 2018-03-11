@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using Orleans;
 using Orleans.Runtime;
+using Remote.Linq;
 
 namespace OrleansSaga.Grains.Queue
 {
@@ -49,7 +52,7 @@ namespace OrleansSaga.Grains.Queue
                     await Execute(requeueGrain, commandId.Value);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Log.Error(0, $"Exception {ex}");
                 //Console.ReadKey();
@@ -68,19 +71,13 @@ namespace OrleansSaga.Grains.Queue
         {
             try
             {
-                Log.Info($"Execute Command {commandId}");
-                var delay = new Random().Next(100, 500);
-                await Task.Delay(delay);
-                //if (commandId % 7 == 0)
-                //{
-                //    throw new Exception("test");
-                //}
+                var command = GrainFactory.GetGrain<ICommandGrain>(commandId);
+                await command.Execute();
                 await requeueGrain.Complete(commandId, this);
-                //await requeueGrain.Enqueue(commandId + 100000);
             }
             catch (Exception ex)
             {
-                Log.Error(0, $"Worker execute Command {commandId} Exception: {ex}");
+                Log.Warn(0, $"Worker execute Command {commandId} Exception: {ex}");
                 await requeueGrain.Fail(commandId, this, ex.ToString());
             }
         }

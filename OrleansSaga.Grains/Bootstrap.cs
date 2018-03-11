@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Providers;
 using OrleansSaga.Grains.Queue;
 
@@ -52,12 +49,14 @@ namespace OrleansSaga.Grains
             //await queueGrain.Start(TimeSpan.FromSeconds(1));
             //await queueGrain.Add(new StartMessage());
 
-            DateTimeOffset offset = DateTimeOffset.Now.AddSeconds(115);
+            DateTimeOffset offset = DateTimeOffset.Now.AddSeconds(15);
 
-            for (int q = 0; q < 2000; q++)
+            for (int q = 0; q < 100; q++)
             {
+                var seed = new Random().Next(10000, int.MaxValue);
                 var queueGrain = providerRuntime.GrainFactory.GetGrain<IRequeueGrain>($"TestQueue{q}");
-                await queueGrain.Schedule(offset, Enumerable.Range(0, 1 * 200).Select(i => (long)i).ToArray());
+                var commandids = Enumerable.Range(0, 1 * 100).Select(i => (long)i + seed).ToArray();
+                await queueGrain.Schedule(offset, commandids);
             }
 
             //return TaskDone.Done;

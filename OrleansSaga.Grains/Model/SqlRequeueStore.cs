@@ -2,6 +2,7 @@
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
+using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 
@@ -11,6 +12,11 @@ namespace OrleansSaga.Grains.Model
     {
         string _connectionString;
 
+        public const string SelectScheduledSql = @"SELECT * FROM [dbo].[Scheduled] WHERE QueueId = @QueueId";
+        public const string SelectEnqueuedSql = @"SELECT * FROM [dbo].[Enqueued] WHERE QueueId = @QueueId ORDER BY Enqueued";
+        public const string SelectAssignedSql = @"SELECT * FROM [dbo].[Assigned] WHERE QueueId = @QueueId";
+        public const string SelectFinishedSql = @"SELECT TOP (10000) * FROM [dbo].[Finished] WHERE QueueId = @QueueId";
+        
         public const string InsertScheduledSql = @"INSERT INTO [dbo].[Scheduled] (QueueId, CommandId, TryCount, Scheduled, RunAt) VALUES (@QueueId, @CommandId, @TryCount, @Scheduled, @RunAt); SELECT CAST(SCOPE_IDENTITY() as bigint);";
         public const string InsertEnqueuedSql = @"INSERT INTO [dbo].[Enqueued] (QueueId, CommandId, TryCount, Enqueued) VALUES (@QueueId, @CommandId, @TryCount, @Enqueued); SELECT CAST(SCOPE_IDENTITY() as bigint);";
         public const string InsertAssignedSql = @"INSERT INTO [dbo].[Assigned] (QueueId, CommandId, TryCount, WorkerId, Assigned) VALUES (@QueueId, @CommandId, @TryCount, @WorkerId, @Assigned); SELECT CAST(SCOPE_IDENTITY() as bigint);";
@@ -27,6 +33,38 @@ namespace OrleansSaga.Grains.Model
         public SqlRequeueStore(string queueId) : base(queueId)
         {
             _connectionString = ConfigurationManager.ConnectionStrings["SqlRequeueStore"].ConnectionString;
+        }
+
+        public override async Task Load()
+        {
+            await WithConnection(async (c, t) =>
+            {
+                var p = new DynamicParameters();
+                p.Add(nameof(QueueId), QueueId, DbType.String);
+
+                var assigned = await c.QueryAsync<RequeueCommandAssigned>(
+                    sql: SelectAssignedSql,
+                    param: p,
+                    transaction: t,
+                    commandType: CommandType.Text);
+                Assigned.AddRange(assigned);
+
+                var enqueued = await c.QueryAsync<RequeueCommandEnqueued>(
+                    sql: SelectEnqueuedSql,
+                    param: p,
+                    transaction: t,
+                    commandType: CommandType.Text);
+                enqueued.ToList().ForEach(Queued.Enqueue);                
+
+                var scheduled = await c.QueryAsync<RequeueCommandScheduled>(
+                    sql: SelectScheduledSql,
+                    param: p,
+                    transaction: t,
+                    commandType: CommandType.Text);
+                Scheduled.AddRange(scheduled);
+
+                return 0;
+            });            
         }
 
         private static async Task<long> InsertEnqueued(SqlConnection c, SqlTransaction t, RequeueCommandEnqueued enqueued)
@@ -76,7 +114,7 @@ namespace OrleansSaga.Grains.Model
         private async Task DeleteEnqueued(SqlConnection c, SqlTransaction t, long commandId)
         {
             var p = new DynamicParameters();
-            p.Add("QueueId", QueueId, DbType.String);
+            p.Add(nameof(QueueId), QueueId, DbType.String);
             p.Add("CommandId", commandId, DbType.Int64);
             await c.ExecuteAsync(
                 sql: DeleteEnqueuedSql,
@@ -88,7 +126,7 @@ namespace OrleansSaga.Grains.Model
         private async Task DeleteAssigned(SqlConnection c, SqlTransaction t, long commandId)
         {
             var p = new DynamicParameters();
-            p.Add("QueueId", QueueId, DbType.String);
+            p.Add(nameof(QueueId), QueueId, DbType.String);
             p.Add("CommandId", commandId, DbType.Int64);
             await c.ExecuteAsync(
                 sql: DeleteAssignedSql,
@@ -100,7 +138,7 @@ namespace OrleansSaga.Grains.Model
         private async Task DeleteAssignedByWorkerId(SqlConnection c, SqlTransaction t, long workerId)
         {
             var p = new DynamicParameters();
-            p.Add("QueueId", QueueId, DbType.String);
+            p.Add(nameof(QueueId), QueueId, DbType.String);
             p.Add("WorkerId", workerId, DbType.Int64);
             await c.ExecuteAsync(
                 sql: DeleteAssignedByWorkerIdSql,
@@ -112,7 +150,7 @@ namespace OrleansSaga.Grains.Model
         private async Task DeleteScheduled(SqlConnection c, SqlTransaction t, long commandId)
         {
             var p = new DynamicParameters();
-            p.Add("QueueId", QueueId, DbType.String);
+            p.Add(nameof(QueueId), QueueId, DbType.String);
             p.Add("CommandId", commandId, DbType.Int64);
             await c.ExecuteAsync(
                     sql: DeleteScheduledSql,
@@ -121,7 +159,7 @@ namespace OrleansSaga.Grains.Model
                     commandType: CommandType.Text);
         }
 
-        public override async Task<RequeueCommandAssigned> Dequeue(long workerId)
+        public override async Task<RequeueCommandAssigned> Assign(long workerId)
         {
             return await WithConnection(async (c, t) =>
             {

@@ -13,7 +13,7 @@ namespace OrleansSaga.Grains.Queue
         protected Logger Log { get; set; }
         protected IDisposable Timer { get; set; }
         protected Stack<IRequeueWorkerGrain> WorkerPool { get; private set; } = new Stack<IRequeueWorkerGrain>();
-        protected RequeueStore Store { get; set; }
+        protected IRequeueStore Store { get; set; }
         protected IBackoffProvider BackoffProvider { get; set; }
         protected int MaxTryCount { get; set; } = 5;
 
@@ -28,13 +28,15 @@ namespace OrleansSaga.Grains.Queue
             Log = GetLogger($"RequeueGrain-{grainId}");
             var interval = TimeSpan.FromSeconds(5);
             Timer = RegisterTimer(SchedulerCallback, null, TimeSpan.Zero, interval);
+            BackoffProvider = new FibonacciBackoff(TimeSpan.FromSeconds(5));
             for (long i = 0; i < 1; i++)
             {
                 var worker = GrainFactory.GetGrain<IRequeueWorkerGrain>(i, grainId, null);
                 WorkerPool.Push(worker);
             }
             Store = new SqlRequeueStore(grainId);
-            BackoffProvider = new FibonacciBackoff(TimeSpan.FromSeconds(5));
+            await Store.Load();            
+            Store.Assigned.ForEach(async a => await Fail(a, "Fail Assigned"));            
             await base.OnActivateAsync();
         }
 
@@ -62,7 +64,7 @@ namespace OrleansSaga.Grains.Queue
 
         public async Task<long?> Dequeue(IRequeueWorkerGrain worker)
         {
-            var command = await Store.Dequeue(worker.GetPrimaryKeyLong(out string s));
+            var command = await Store.Assign(worker.GetPrimaryKeyLong(out string s));
             if (command == null)
             {
                 //Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} WorkerPool Push {worker.GetPrimaryKey(out string s1)}");
@@ -89,9 +91,21 @@ namespace OrleansSaga.Grains.Queue
                 await Store.Fail(commandId, workerId, reason);
                 return;
             }
-            Log.Info($"RequeueGrain {assigned}");
+
             var delay = BackoffProvider.Next(assigned.TryCount + 1);
             await Schedule(delay, commandId);
+        }
+
+        public async Task Fail(RequeueCommandAssigned assigned, string reason)
+        {
+            if (assigned.TryCount + 1 > MaxTryCount)
+            {
+                await Store.Fail(assigned.CommandId, assigned.WorkerId, reason);
+                return;
+            }
+
+            var delay = BackoffProvider.Next(assigned.TryCount + 1);
+            await Schedule(delay, assigned.CommandId);
         }
 
         public Task Schedule(TimeSpan timeSpan, params long[] commandIds)
@@ -112,7 +126,7 @@ namespace OrleansSaga.Grains.Queue
         {
             try
             {
-                Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Stats - Enqueued: {Store.Queued.Count}, Scheduled: {Store.Scheduled.Count}, Finished: {Store.Finished.Count}, Worker Pool: {WorkerPool.Count}, Assigned: {Store.Assigned.Count}");
+                //Log.Info($"RequeueGrain {this.GetPrimaryKeyString()} Stats - Enqueued: {Store.Queued.Count}, Scheduled: {Store.Scheduled.Count}, Finished: {Store.Finished.Count}, Worker Pool: {WorkerPool.Count}, Assigned: {Store.Assigned.Count}");
                 var enqueue = await Store.GetScheduled(DateTimeOffset.Now);
                 if (enqueue.Count() > 0)
                 {

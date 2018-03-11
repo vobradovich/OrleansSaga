@@ -13,13 +13,15 @@ namespace OrleansSaga.Grains.Model
         {
             QueueId = queueId;
         }
-
+        
         public Queue<RequeueCommandEnqueued> Queued { get; } = new Queue<RequeueCommandEnqueued>();
         public List<RequeueCommandScheduled> Scheduled { get; } = new List<RequeueCommandScheduled>();
         public List<RequeueCommandFinished> Finished { get; } = new List<RequeueCommandFinished>();
         public List<RequeueCommandAssigned> Assigned { get; } = new List<RequeueCommandAssigned>();
 
-        public virtual Task<RequeueCommandAssigned> Dequeue(long workerId)
+        public virtual Task Load() => Task.CompletedTask;
+
+        public virtual Task<RequeueCommandAssigned> Assign(long workerId)
         {
             Assigned.RemoveAll(a => a.WorkerId == workerId);
             if (Queued.Count > 0)
@@ -83,6 +85,7 @@ namespace OrleansSaga.Grains.Model
 
     public interface IRequeueStore
     {
+        Task Load();
         Queue<RequeueCommandEnqueued> Queued { get; }
         List<RequeueCommandScheduled> Scheduled { get; }
         List<RequeueCommandFinished> Finished { get; }
@@ -90,7 +93,7 @@ namespace OrleansSaga.Grains.Model
         Task Enqueue(params long[] commandIds);
         Task Schedule(DateTimeOffset dateTime, params long[] commandIds);
         Task<long[]> GetScheduled(DateTimeOffset dateTime);
-        Task<RequeueCommandAssigned> Dequeue(long workerId);
+        Task<RequeueCommandAssigned> Assign(long workerId);
         Task Complete(long commandId, long workerId);
         Task Fail(long commandId, long workerId, string reason);
     }

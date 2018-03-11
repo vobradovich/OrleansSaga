@@ -8,10 +8,7 @@ namespace OrleansSaga.Grains.Model
     {
         private T _data;
 
-        public new T Data
-        {
-            get { return _data ?? (_data = GetData<T>()); }
-        }
+        public new T Data => _data ?? (_data = GetData<T>());
 
         public GrainEvent(T data)
         {
